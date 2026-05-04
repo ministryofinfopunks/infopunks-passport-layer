@@ -15,6 +15,11 @@ Minimal production-style MVP for Infopunks Passport Layer: machine-readable iden
 - `GET /openapi.json`
 - `GET /.well-known/infopunks-passport-layer.json`
 
+## Mainnet Proof Archive
+
+Canonical Infopunks v0 proof archive:
+https://github.com/ministryofinfopunks/infopunks-v0-mainnet-proof
+
 ## Local install
 ```bash
 npm install
