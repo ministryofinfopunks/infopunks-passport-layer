@@ -279,6 +279,13 @@ async function verifyViaFacilitator(
 }
 
 function buildDiscoveryManifest(config: AppConfig): Record<string, unknown> {
+  const pricing = {
+    rail: "x402",
+    scheme: "exact",
+    price_usd: config.x402PriceUsd,
+    facilitator: config.x402FacilitatorProvider
+  };
+
   return {
     name: "Infopunks Passport Layer",
     description: "Machine-readable identity, claim hygiene, and routing for agents.",
@@ -287,25 +294,49 @@ function buildDiscoveryManifest(config: AppConfig): Record<string, unknown> {
         method: "POST",
         path: "/v1/passport/register",
         url: `${config.publicBaseUrl}/v1/passport/register`,
-        description: "Register a machine-readable Passport for an agent, wallet, endpoint, human, or project."
+        resource: `${config.publicBaseUrl}/v1/passport/register`,
+        routeTemplate: "/v1/passport/register",
+        description: "Register a machine-readable Passport for an agent, wallet, endpoint, human, or project.",
+        pricing,
+        network: config.x402Network,
+        asset: config.x402Asset,
+        payTo: config.x402PayTo
       },
       passport_attest: {
         method: "POST",
         path: "/v1/passport/attest",
         url: `${config.publicBaseUrl}/v1/passport/attest`,
-        description: "Attach evidence or attestations to an existing Passport."
+        resource: `${config.publicBaseUrl}/v1/passport/attest`,
+        routeTemplate: "/v1/passport/attest",
+        description: "Attach evidence or attestations to an existing Passport.",
+        pricing,
+        network: config.x402Network,
+        asset: config.x402Asset,
+        payTo: config.x402PayTo
       },
       verify_claim: {
         method: "POST",
         path: "/v1/verify-claim",
         url: `${config.publicBaseUrl}/v1/verify-claim`,
-        description: "Verify whether a claim is supported, weak, disputed, outdated, or narratively risky."
+        resource: `${config.publicBaseUrl}/v1/verify-claim`,
+        routeTemplate: "/v1/verify-claim",
+        description: "Verify whether a claim is supported, weak, disputed, outdated, or narratively risky.",
+        pricing,
+        network: config.x402Network,
+        asset: config.x402Asset,
+        payTo: config.x402PayTo
       },
       route_agent: {
         method: "POST",
         path: "/v1/route-agent",
         url: `${config.publicBaseUrl}/v1/route-agent`,
-        description: "Select the best agent for a task based on trust, domain fit, budget, and risk tolerance."
+        resource: `${config.publicBaseUrl}/v1/route-agent`,
+        routeTemplate: "/v1/route-agent",
+        description: "Select the best agent for a task based on trust, domain fit, budget, and risk tolerance.",
+        pricing,
+        network: config.x402Network,
+        asset: config.x402Asset,
+        payTo: config.x402PayTo
       }
     },
     extensions: {
