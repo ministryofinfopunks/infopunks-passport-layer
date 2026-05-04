@@ -76,12 +76,14 @@ describe("infopunks-passport-layer mvp", () => {
     expect(res.headers.get("x402-pricing-units")).toBe("1");
     expect(res.headers.get("x402-supported-networks")).toBe("eip155:8453");
     expect(res.headers.get("x402-accepted-assets")).toBe("USDC");
+    expect(res.headers.get("PAYMENT-REQUIRED")).toBeTruthy();
 
     const body = await res.json();
     expect(body.x402Version).toBe(1);
     expect(Array.isArray(body.accepts)).toBe(true);
     expect(body.accepts[0].scheme).toBe("exact");
     expect(body.accepts[0].network).toBe("base");
+    expect(body.payment.required_header).toBe("PAYMENT-SIGNATURE");
     expect(body.accepts[0].resource).toBe(`${server.baseUrl}/v1/verify-claim`);
   });
 
@@ -124,6 +126,46 @@ describe("infopunks-passport-layer mvp", () => {
     expect(body.receipt).toBeTruthy();
     expect(body.receipt.x402_verified).toBe(true);
     expect(body.receipt.asset).toBe("USDC");
+  });
+
+  test("paid middleware accepts PAYMENT-SIGNATURE header in mock mode", async () => {
+    const res = await fetch(`${server.baseUrl}/v1/verify-claim`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "PAYMENT-SIGNATURE": "mock-signature-header"
+      },
+      body: JSON.stringify({
+        claim: "Agents may automate parts of market analysis",
+        context: "We have receipts, tests, and benchmarks in this context for deterministic checks.",
+        requested_depth: "light",
+        risk_mode: "general"
+      })
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.receipt.x402_verified).toBe(true);
+  });
+
+  test("old x-payment still works in mock mode", async () => {
+    const res = await fetch(`${server.baseUrl}/v1/verify-claim`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-payment": "mock-old-header"
+      },
+      body: JSON.stringify({
+        claim: "Agents may automate parts of market analysis",
+        context: "We have receipts, tests, and benchmarks in this context for deterministic checks.",
+        requested_depth: "light",
+        risk_mode: "general"
+      })
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.receipt.x402_verified).toBe(true);
   });
 
   test("passport registration", async () => {

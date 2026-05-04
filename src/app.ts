@@ -31,6 +31,7 @@ interface AppConfig {
   x402VerifierTimeoutMs: number;
   cdpApiKeyId: string | null;
   cdpApiKeySecret: string | null;
+  x402Debug: boolean;
 }
 
 interface ReceiptWithMeta {
@@ -100,11 +101,23 @@ function newEventId(): string {
   return `evt_${randomUUID()}`;
 }
 
-function getPaymentHeader(req: Request): string | null {
-  const candidates = ["x-payment", "payment-signature", "x402-payment"];
+interface SelectedPaymentHeader {
+  name: string;
+  value: string;
+}
+
+function getPaymentHeader(req: Request): SelectedPaymentHeader | null {
+  const candidates = [
+    "payment-signature",
+    "x-payment",
+    "x402-payment",
+    "payment"
+  ];
   for (const key of candidates) {
     const v = req.header(key);
-    if (v && v.trim()) return v.trim();
+    if (v && v.trim()) {
+      return { name: key, value: v.trim() };
+    }
   }
   return null;
 }
@@ -163,12 +176,17 @@ function buildPaymentChallenge(config: AppConfig, requestPath: string, error: st
       price_usd: config.x402PriceUsd,
       price_atomic: priceUsdToAtomic(config.x402PriceUsd),
       pay_to: config.x402PayTo,
-      required_header: config.x402MockMode ? "x-payment or payment-signature" : "x402-payment",
+      required_header: "PAYMENT-SIGNATURE",
       facilitator_url: config.x402FacilitatorUrl,
       resource: requirement.resource,
       method: "POST"
     }
   };
+}
+
+function setPaymentRequiredHeader(reply: Response, challenge: Record<string, unknown>): void {
+  const encoded = Buffer.from(JSON.stringify(challenge), "utf8").toString("base64");
+  reply.setHeader("PAYMENT-REQUIRED", encoded);
 }
 
 function decodePossibleBase64Json(input: string): Record<string, unknown> | null {
@@ -207,10 +225,7 @@ async function verifyViaFacilitator(
 
   const payload = {
     x402Version: 2,
-    paymentPayload: {
-      x402Version: 2,
-      ...paymentPayload
-    },
+    paymentPayload,
     paymentRequirements
   };
   const baseUrl = config.x402FacilitatorUrl.replace(/\/$/, "");
@@ -431,7 +446,8 @@ function createDefaultConfig(): AppConfig {
     x402FacilitatorUrl: process.env.X402_FACILITATOR_URL ?? "https://api.cdp.coinbase.com/platform/v2/x402",
     x402VerifierTimeoutMs: Number(process.env.X402_VERIFIER_TIMEOUT_MS ?? 8000),
     cdpApiKeyId: process.env.CDP_API_KEY_ID ?? null,
-    cdpApiKeySecret: process.env.CDP_API_KEY_SECRET ?? null
+    cdpApiKeySecret: process.env.CDP_API_KEY_SECRET ?? null,
+    x402Debug: parseBool(process.env.X402_DEBUG, false)
   };
 }
 
@@ -458,10 +474,12 @@ export function createApp(overrides?: Partial<AppConfig>) {
   }
 
   async function requirePaid(req: PaidRequest, res: Response, next: NextFunction): Promise<void> {
-    const header = getPaymentHeader(req);
-    if (!header) {
+    const selectedHeader = getPaymentHeader(req);
+    if (!selectedHeader) {
       apply402Headers(res);
-      res.status(402).json(buildPaymentChallenge(config, req.path, "X-PAYMENT header is required"));
+      const challenge = buildPaymentChallenge(config, req.path, "PAYMENT-SIGNATURE header is required");
+      setPaymentRequiredHeader(res, challenge);
+      res.status(402).json(challenge);
       return;
     }
 
@@ -469,16 +487,33 @@ export function createApp(overrides?: Partial<AppConfig>) {
       req.payment = {
         verified: true,
         provider: "mock",
-        reference: `mock_${createHash("sha256").update(header).digest("hex").slice(0, 16)}`
+        reference: `mock_${createHash("sha256").update(selectedHeader.value).digest("hex").slice(0, 16)}`
       };
       next();
       return;
     }
 
-    const verified = await verifyViaFacilitator(config, header, req.path).catch(() => null);
+    const verified = await verifyViaFacilitator(config, selectedHeader.value, req.path).catch(() => null);
     if (!verified) {
       apply402Headers(res);
-      res.status(402).json(buildPaymentChallenge(config, req.path, "x402 facilitator verify/settle failed."));
+      const challenge = buildPaymentChallenge(config, req.path, "x402 facilitator verify/settle failed.");
+      setPaymentRequiredHeader(res, challenge);
+      if (config.x402Debug) {
+        const decoded = decodePossibleBase64Json(selectedHeader.value);
+        const requirement = buildX402PaymentRequirement(config, req.path);
+        res.status(402).json({
+          ...challenge,
+          debug: {
+            received_payment_header_name: selectedHeader.name,
+            payment_payload_present: Boolean(decoded && typeof decoded === "object"),
+            payment_requirements_network: requirement.network,
+            payment_requirements_resource: requirement.resource,
+            facilitator_provider: config.x402FacilitatorProvider
+          }
+        });
+        return;
+      }
+      res.status(402).json(challenge);
       return;
     }
 
