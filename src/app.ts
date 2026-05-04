@@ -134,7 +134,7 @@ function buildX402PaymentRequirement(config: AppConfig, requestPath: string): Re
   const resource = `${config.publicBaseUrl}${normalizeRequestPath(requestPath)}`;
   return {
     scheme: "exact",
-    network: config.x402Network,
+    network: "base",
     maxAmountRequired: priceUsdToAtomic(config.x402PriceUsd),
     resource,
     description: "Infopunks Passport Layer paid endpoint",
@@ -157,7 +157,7 @@ function buildPaymentChallenge(config: AppConfig, requestPath: string, error: st
       version: "x402",
       mode: config.x402MockMode ? "mock" : "facilitator",
       scheme: "exact",
-      network: config.x402Network,
+      network: "base",
       asset_symbol: config.x402Asset,
       asset_address: config.x402PaymentAssetAddress,
       price_usd: config.x402PriceUsd,

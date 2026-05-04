@@ -81,6 +81,7 @@ describe("infopunks-passport-layer mvp", () => {
     expect(body.x402Version).toBe(1);
     expect(Array.isArray(body.accepts)).toBe(true);
     expect(body.accepts[0].scheme).toBe("exact");
+    expect(body.accepts[0].network).toBe("base");
     expect(body.accepts[0].resource).toBe(`${server.baseUrl}/v1/verify-claim`);
   });
 
@@ -103,7 +104,8 @@ describe("infopunks-passport-layer mvp", () => {
     const body = await res.json();
     expect(body.x402Version).toBe(1);
     expect(body.error).toBeTruthy();
-    expect(body.payment.network).toBe("eip155:8453");
+    expect(body.payment.network).toBe("base");
+    expect(body.accepts[0].network).toBe("base");
     expect(body.payment.asset_symbol).toBe("USDC");
     expect(body.accepts[0].resource).toBe(`${server.baseUrl}/v1/route-agent`);
     expect(body.accepts[0].mimeType).toBe("application/json");
