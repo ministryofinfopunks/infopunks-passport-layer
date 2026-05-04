@@ -24,6 +24,8 @@ interface AppConfig {
   x402Network: string;
   x402Asset: string;
   x402PriceUsd: string;
+  x402PaymentAssetAddress: string;
+  x402PayTo: string;
   x402FacilitatorProvider: string;
   x402FacilitatorUrl: string | null;
   x402VerifierTimeoutMs: number;
@@ -116,6 +118,59 @@ function apply402Headers(reply: Response): void {
   reply.setHeader("x402-accepted-assets", "USDC");
 }
 
+function normalizeRequestPath(requestPath: string): string {
+  const pathWithoutQuery = requestPath.split("?")[0] ?? requestPath;
+  if (pathWithoutQuery.startsWith("/")) return pathWithoutQuery;
+  return `/${pathWithoutQuery}`;
+}
+
+function priceUsdToAtomic(priceUsd: string): string {
+  const numeric = Number(priceUsd);
+  if (!Number.isFinite(numeric) || numeric <= 0) return "10000";
+  return String(Math.round(numeric * 1_000_000));
+}
+
+function buildX402PaymentRequirement(config: AppConfig, requestPath: string): Record<string, unknown> {
+  const resource = `${config.publicBaseUrl}${normalizeRequestPath(requestPath)}`;
+  return {
+    scheme: "exact",
+    network: config.x402Network,
+    maxAmountRequired: priceUsdToAtomic(config.x402PriceUsd),
+    resource,
+    description: "Infopunks Passport Layer paid endpoint",
+    mimeType: "application/json",
+    payTo: config.x402PayTo,
+    maxTimeoutSeconds: 300,
+    asset: config.x402PaymentAssetAddress,
+    extra: { name: "USD Coin", version: "2" }
+  };
+}
+
+function buildPaymentChallenge(config: AppConfig, requestPath: string, error: string): Record<string, unknown> {
+  const requirement = buildX402PaymentRequirement(config, requestPath);
+  return {
+    x402Version: 1,
+    accepts: [requirement],
+    error,
+    message: "x402 payment required for this endpoint.",
+    payment: {
+      version: "x402",
+      mode: config.x402MockMode ? "mock" : "facilitator",
+      scheme: "exact",
+      network: config.x402Network,
+      asset_symbol: config.x402Asset,
+      asset_address: config.x402PaymentAssetAddress,
+      price_usd: config.x402PriceUsd,
+      price_atomic: priceUsdToAtomic(config.x402PriceUsd),
+      pay_to: config.x402PayTo,
+      required_header: config.x402MockMode ? "x-payment or payment-signature" : "x402-payment",
+      facilitator_url: config.x402FacilitatorUrl,
+      resource: requirement.resource,
+      method: "POST"
+    }
+  };
+}
+
 function decodePossibleBase64Json(input: string): Record<string, unknown> | null {
   try {
     const direct = JSON.parse(input);
@@ -138,7 +193,6 @@ function decodePossibleBase64Json(input: string): Record<string, unknown> | null
 async function verifyViaFacilitator(
   config: AppConfig,
   paymentHeader: string,
-  method: string,
   requestPath: string
 ): Promise<PaymentVerification | null> {
   if (!config.x402FacilitatorUrl) return null;
@@ -149,20 +203,7 @@ async function verifyViaFacilitator(
     value != null && typeof value === "object" && !Array.isArray(value);
 
   const paymentPayload = isObj(decoded.paymentPayload) ? decoded.paymentPayload : decoded;
-  const paymentRequirements = isObj(decoded.paymentRequirements)
-    ? decoded.paymentRequirements
-    : {
-      scheme: "exact",
-      network: config.x402Network,
-      maxAmountRequired: "10000",
-      resource: `${config.publicBaseUrl}${requestPath}`,
-      description: "Infopunks Passport Layer paid endpoint",
-      mimeType: "application/json",
-      payTo: "0x0000000000000000000000000000000000000000",
-      maxTimeoutSeconds: 300,
-      asset: "0x833589fCD6eDb6E08f4c7c32D4f71b54bdA02913",
-      extra: { name: "USDC", version: "2", method }
-    };
+  const paymentRequirements = buildX402PaymentRequirement(config, requestPath);
 
   const payload = {
     x402Version: 2,
@@ -384,6 +425,8 @@ function createDefaultConfig(): AppConfig {
     x402Network: process.env.X402_NETWORK ?? "eip155:8453",
     x402Asset: process.env.X402_ASSET ?? "USDC",
     x402PriceUsd: process.env.X402_PRICE_USD ?? "0.01",
+    x402PaymentAssetAddress: process.env.X402_PAYMENT_ASSET_ADDRESS ?? "0x833589fCD6eDb6E08f4c7c32D4f71b54bdA02913",
+    x402PayTo: process.env.X402_PAY_TO ?? "0xe4E8908308a86aB43E5dEb6C0fd0F006786104c3",
     x402FacilitatorProvider: process.env.X402_FACILITATOR_PROVIDER ?? "cdp",
     x402FacilitatorUrl: process.env.X402_FACILITATOR_URL ?? "https://api.cdp.coinbase.com/platform/v2/x402",
     x402VerifierTimeoutMs: Number(process.env.X402_VERIFIER_TIMEOUT_MS ?? 8000),
@@ -418,7 +461,7 @@ export function createApp(overrides?: Partial<AppConfig>) {
     const header = getPaymentHeader(req);
     if (!header) {
       apply402Headers(res);
-      res.status(402).json({ error: "payment_required", message: "x402 payment required for this endpoint." });
+      res.status(402).json(buildPaymentChallenge(config, req.path, "X-PAYMENT header is required"));
       return;
     }
 
@@ -432,10 +475,10 @@ export function createApp(overrides?: Partial<AppConfig>) {
       return;
     }
 
-    const verified = await verifyViaFacilitator(config, header, req.method, req.path).catch(() => null);
+    const verified = await verifyViaFacilitator(config, header, req.path).catch(() => null);
     if (!verified) {
       apply402Headers(res);
-      res.status(402).json({ error: "payment_verification_failed", message: "x402 facilitator verify/settle failed." });
+      res.status(402).json(buildPaymentChallenge(config, req.path, "x402 facilitator verify/settle failed."));
       return;
     }
 

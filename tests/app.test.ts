@@ -76,6 +76,37 @@ describe("infopunks-passport-layer mvp", () => {
     expect(res.headers.get("x402-pricing-units")).toBe("1");
     expect(res.headers.get("x402-supported-networks")).toBe("eip155:8453");
     expect(res.headers.get("x402-accepted-assets")).toBe("USDC");
+
+    const body = await res.json();
+    expect(body.x402Version).toBe(1);
+    expect(Array.isArray(body.accepts)).toBe(true);
+    expect(body.accepts[0].scheme).toBe("exact");
+    expect(body.accepts[0].resource).toBe(`${server.baseUrl}/v1/verify-claim`);
+  });
+
+  test("unpaid route-agent returns structured challenge with correct resource", async () => {
+    const res = await post("/v1/route-agent", {
+      task: "analyze token launch risk",
+      context: { domain: "market-analysis", chain: "base", urgency: "high" },
+      candidates: [{ agent_id: "agent_a" }],
+      budget: { amount: "0.25", asset: "USDC" },
+      risk_tolerance: "medium",
+      policy: {
+        minimum_trust_score: 70,
+        require_recent_evidence: true,
+        prefer_domain_fit: true,
+        allow_unproven_agents: false
+      }
+    }, false);
+
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.x402Version).toBe(1);
+    expect(body.error).toBeTruthy();
+    expect(body.payment.network).toBe("eip155:8453");
+    expect(body.payment.asset_symbol).toBe("USDC");
+    expect(body.accepts[0].resource).toBe(`${server.baseUrl}/v1/route-agent`);
+    expect(body.accepts[0].mimeType).toBe("application/json");
   });
 
   test("mock paid endpoint returns 200 with receipt", async () => {
