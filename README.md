@@ -40,33 +40,27 @@ Resource map:
 - `/v1/verify-claim` checks whether a claim is supported, weak, disputed, outdated, or narratively risky.
 - `/v1/route-agent` selects the best agent for a task based on trust, domain fit, budget, and risk tolerance.
 
-## Proof
+## Live Proof
 
-Proof index:
+Fresh paid receipts are available from the public proof index:
 
 ```text
 https://infopunks-passport-layer.onrender.com/proof
 ```
 
-Fresh proof page:
+Recent paid events:
 
 ```text
-https://infopunks-passport-layer.onrender.com/proof/xrc_7ac41db8-b3a4-447c-b871-bb8a60289755
+https://infopunks-passport-layer.onrender.com/v1/events/recent
 ```
 
-## Receipts
-
-Public receipt endpoint:
+Receipt lookup template:
 
 ```text
-GET /receipts/{receipt_id}
+https://infopunks-passport-layer.onrender.com/receipts/{receipt_id}
 ```
 
-Fresh receipt:
-
-```text
-https://infopunks-passport-layer.onrender.com/receipts/xrc_7ac41db8-b3a4-447c-b871-bb8a60289755
-```
+Receipt IDs are generated per paid call and may rotate after redeploy while v0 uses in-memory proof storage.
 
 Receipts expose public metadata only: receipt id, endpoint, paid resource, timestamp, input hash, output hash, x402 verification status, network, asset, facilitator provider, and final status.
 
