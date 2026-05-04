@@ -51,7 +51,7 @@ https://infopunks-passport-layer.onrender.com/proof
 Fresh proof page:
 
 ```text
-https://infopunks-passport-layer.onrender.com/proof/xrc_da0db29e-8f12-4f85-9f09-22da5030c975
+https://infopunks-passport-layer.onrender.com/proof/xrc_7ac41db8-b3a4-447c-b871-bb8a60289755
 ```
 
 ## Receipts
@@ -65,7 +65,7 @@ GET /receipts/{receipt_id}
 Fresh receipt:
 
 ```text
-https://infopunks-passport-layer.onrender.com/receipts/xrc_da0db29e-8f12-4f85-9f09-22da5030c975
+https://infopunks-passport-layer.onrender.com/receipts/xrc_7ac41db8-b3a4-447c-b871-bb8a60289755
 ```
 
 Receipts expose public metadata only: receipt id, endpoint, paid resource, timestamp, input hash, output hash, x402 verification status, network, asset, facilitator provider, and final status.
@@ -93,7 +93,7 @@ Infopunks discovery manifest:
 https://infopunks-passport-layer.onrender.com/.well-known/infopunks-passport-layer.json
 ```
 
-The discovery metadata advertises the paid Passport resources, route templates, Base network configuration, accepted asset, and Bazaar-compatible extension metadata.
+The discovery metadata advertises the paid Passport resources, route templates, pricing, Base network configuration, accepted asset, payTo address, and Bazaar-compatible extension metadata.
 
 ## OpenAPI
 
@@ -237,6 +237,6 @@ Phase 3: Passport + Routing is confirmed as a v0 mainnet proof.
 
 Fresh paid receipt:
 
-`xrc_da0db29e-8f12-4f85-9f09-22da5030c975`
+`xrc_7ac41db8-b3a4-447c-b871-bb8a60289755`
 
 The service verifies x402 payment through CDP on Base mainnet and returns a route decision through `/v1/route-agent`.
